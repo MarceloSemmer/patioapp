@@ -69,7 +69,7 @@ checagem de permissão no servidor — nunca apenas no cliente.
 | Auditoria | ✅ | Somente leitura, ações críticas |
 | Portal do locatário | ✅ | Isolado por `tenantId`, dashboard, contrato, cobranças, documentos, chamados, dados |
 | Usuários e permissões | ✅ | Convite (via Resend se configurado, senão link exibido em tela), papéis, escopo por empresa/empreendimento |
-| Vistorias/checklists | ⚠️ Modelado, sem UI | Tabelas `inspections`/`inspection_items` no schema, tela ainda não implementada |
+| Vistorias/checklists | ✅ | Entrada, saída, periódica, segurança etc.; checklist por item (conforme/não conforme/não se aplica), foto por item, laudo em PDF |
 | Comparação de unidades lado a lado | ⚠️ Não implementado | Ver "Limitações conhecidas" |
 | Envio real de e-mail (convite/senha) | ⚠️ Integração pronta, não validada | Ativa via `RESEND_API_KEY`; nunca testada contra a API real — ver "Limitações conhecidas" |
 | WhatsApp/SMS/push | ⚠️ Não implementado | Fora do escopo desta versão |
@@ -430,8 +430,10 @@ com dois empreendimentos (**Pátio Tijuco** e **Pátio Oxford**), 5 setores, 22
 unidades em diferentes situações, 8 locatários, 10 leads em diferentes
 etapas do funil, 2 propostas, 10 contratos (ativos, próximo do vencimento e
 uma minuta), cobranças pagas/pendentes/vencidas, 5 chamados de manutenção em
-diferentes status, documentos de exemplo (incluindo uma planta interativa
-com unidades posicionadas) e notificação inicial. Veja o guia completo em
+diferentes status, 2 vistorias (uma de entrada já realizada com checklist
+preenchido, uma periódica agendada), documentos de exemplo (incluindo uma
+planta interativa com unidades posicionadas) e notificação inicial. Veja o
+guia completo em
 [`docs/admin-quickstart.md`](docs/admin-quickstart.md).
 
 **Estas credenciais e senhas simples existem apenas para uso local/demo.**
@@ -502,8 +504,6 @@ implementado, para não superestimar o entregável:
 - **Índices econômicos (IGP-M/IPCA/INPC)**: tabela de registro manual
   pronta, sem integração automática com fonte oficial (FGV/IBGE) — por
   desenho, para não inventar valores de índice.
-- **Vistorias/checklists**: modelo de dados completo (`inspections`,
-  `inspection_items`) mas sem tela de UI implementada.
 - **Comparação de unidades lado a lado**: não implementada (listagem,
   filtros avançados e detalhamento individual estão completos).
 - **Kanban de CRM/manutenção**: movimentação por seleção/botões, não por

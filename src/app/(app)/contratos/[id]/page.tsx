@@ -51,6 +51,11 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
         actions={
           <>
             <Badge variant={contractStatusColors[contract.status]}>{contractStatusLabels[contract.status]}</Badge>
+            {roleHasPermission(session.user.role, "inspection:view") && (
+              <Button variant="outline" asChild>
+                <Link href={`/vistorias?empreendimento=${contract.property.id}`}>Vistorias</Link>
+              </Button>
+            )}
             {canManage && <ContractStatusActions contractId={contract.id} status={contract.status} />}
           </>
         }

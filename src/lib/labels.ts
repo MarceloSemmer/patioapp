@@ -246,6 +246,21 @@ export const leadStatusLabels: Record<string, string> = {
   PERDIDO: "Perdido",
 };
 
+export const inspectionTypeLabels: Record<string, string> = {
+  ENTRADA: "Entrada",
+  ENTREGA_CHAVES: "Entrega de chaves",
+  PERIODICA: "Periódica",
+  SAIDA: "Saída",
+  SEGURANCA: "Segurança",
+  MANUTENCAO_PREVENTIVA: "Manutenção preventiva",
+};
+
+export const inspectionItemAnswerLabels: Record<string, string> = {
+  CONFORME: "Conforme",
+  NAO_CONFORME: "Não conforme",
+  NAO_SE_APLICA: "Não se aplica",
+};
+
 export const BRAZILIAN_STATES = [
   "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG",
   "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",

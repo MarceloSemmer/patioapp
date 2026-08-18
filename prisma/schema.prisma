@@ -503,6 +503,7 @@ model Unit {
   leadsInterested    Lead[]
   maintenanceTickets MaintenanceTicket[]
   documents          Document[]
+  inspections        Inspection[]
 
   @@unique([propertyId, code])
   @@map("units")
@@ -860,6 +861,7 @@ model Contract {
   adjustments ContractAdjustment[]
   charges     Charge[]
   documents   Document[]
+  inspections Inspection[]
 
   @@unique([propertyId, number])
   @@map("contracts")
@@ -1068,7 +1070,9 @@ model TicketUpdate {
 model Inspection {
   id              String         @id @default(uuid())
   contractId      String?
+  contract        Contract?      @relation(fields: [contractId], references: [id])
   unitId          String?
+  unit            Unit?          @relation(fields: [unitId], references: [id])
   type            InspectionType
   scheduledAt     DateTime?
   performedAt     DateTime?
