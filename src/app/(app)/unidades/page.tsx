@@ -3,15 +3,11 @@ import { companyScope, propertyScope } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { EmptyState } from "@/components/layout/empty-state";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DoorOpen } from "lucide-react";
-import Link from "next/link";
-import { unitStatusColors, unitStatusLabels, unitTypeLabels } from "@/lib/labels";
-import { formatArea, formatCurrency } from "@/lib/format";
 import { roleHasPermission } from "@/lib/permissions";
 import { UnitFormDialog } from "./unit-form-dialog";
 import { UnitFilters } from "./unit-filters";
+import { UnitsTable } from "./units-table";
 
 export const metadata = { title: "Unidades" };
 
@@ -75,41 +71,7 @@ export default async function UnitsPage({
       {units.length === 0 ? (
         <EmptyState icon={DoorOpen} title="Nenhuma unidade encontrada" description="Ajuste os filtros ou cadastre uma nova unidade." />
       ) : (
-        <div className="overflow-hidden rounded-lg border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Código</TableHead>
-                <TableHead>Empreendimento</TableHead>
-                <TableHead>Setor</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Área</TableHead>
-                <TableHead>Aluguel sugerido</TableHead>
-                <TableHead>Situação</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {units.map((unit) => (
-                <TableRow key={unit.id} className="cursor-pointer">
-                  <TableCell>
-                    <Link href={`/unidades/${unit.id}`} className="font-medium hover:underline">
-                      {unit.code}
-                    </Link>
-                    {unit.commercialName && <p className="text-xs text-muted-foreground">{unit.commercialName}</p>}
-                  </TableCell>
-                  <TableCell>{unit.property.name}</TableCell>
-                  <TableCell>{unit.sector?.name ?? "—"}</TableCell>
-                  <TableCell>{unitTypeLabels[unit.type]}</TableCell>
-                  <TableCell>{formatArea(unit.totalArea)}</TableCell>
-                  <TableCell>{unit.suggestedRent ? formatCurrency(unit.suggestedRent) : "—"}</TableCell>
-                  <TableCell>
-                    <Badge variant={unitStatusColors[unit.status]}>{unitStatusLabels[unit.status]}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <UnitsTable units={units} />
       )}
     </div>
   );

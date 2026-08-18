@@ -70,7 +70,7 @@ checagem de permissão no servidor — nunca apenas no cliente.
 | Portal do locatário | ✅ | Isolado por `tenantId`, dashboard, contrato, cobranças, documentos, chamados, dados |
 | Usuários e permissões | ✅ | Convite (via Resend se configurado, senão link exibido em tela), papéis, escopo por empresa/empreendimento |
 | Vistorias/checklists | ✅ | Entrada, saída, periódica, segurança etc.; checklist por item (conforme/não conforme/não se aplica), foto por item, laudo em PDF |
-| Comparação de unidades lado a lado | ⚠️ Não implementado | Ver "Limitações conhecidas" |
+| Comparação de unidades lado a lado | ✅ | Seleção múltipla (até 4) na listagem; área, valor, valor/m², localização e infraestrutura lado a lado |
 | Envio real de e-mail (convite/senha) | ⚠️ Integração pronta, não validada | Ativa via `RESEND_API_KEY`; nunca testada contra a API real — ver "Limitações conhecidas" |
 | WhatsApp/SMS/push | ⚠️ Não implementado | Fora do escopo desta versão |
 
@@ -504,8 +504,6 @@ implementado, para não superestimar o entregável:
 - **Índices econômicos (IGP-M/IPCA/INPC)**: tabela de registro manual
   pronta, sem integração automática com fonte oficial (FGV/IBGE) — por
   desenho, para não inventar valores de índice.
-- **Comparação de unidades lado a lado**: não implementada (listagem,
-  filtros avançados e detalhamento individual estão completos).
 - **Kanban de CRM/manutenção**: movimentação por seleção/botões, não por
   arraste (drag-and-drop) — funcional, mas menos fluido visualmente.
 - **Autenticação em dois fatores**: mencionada no prompt como "opção
