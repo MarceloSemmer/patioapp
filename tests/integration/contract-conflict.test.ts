@@ -8,6 +8,18 @@ vi.mock("@/lib/session", () => ({
     session.user.role === "SUPERADMIN" ? null : session.user.companyIds,
   propertyScope: (session: { user: { role: string; propertyIds: string[] } }) =>
     session.user.propertyIds.length > 0 ? session.user.propertyIds : null,
+  assertCompanyAccess: (session: { user: { role: string; companyIds: string[] } }, companyId: string) => {
+    if (session.user.role === "SUPERADMIN") return;
+    if (!session.user.companyIds.includes(companyId)) {
+      throw new Error("Você não tem acesso a esta empresa.");
+    }
+  },
+  assertPropertyAccess: (session: { user: { role: string; propertyIds: string[] } }, propertyId: string) => {
+    if (session.user.role === "SUPERADMIN") return;
+    if (session.user.propertyIds.length > 0 && !session.user.propertyIds.includes(propertyId)) {
+      throw new Error("Você não tem acesso a este empreendimento.");
+    }
+  },
 }));
 
 import { requireSession } from "@/lib/session";

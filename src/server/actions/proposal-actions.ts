@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess, assertPropertyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -41,6 +41,9 @@ export async function createProposal(input: ProposalInput) {
   const data = proposalSchema.parse(input);
 
   const property = await prisma.property.findUniqueOrThrow({ where: { id: data.propertyId } });
+  assertCompanyAccess(session, property.companyId);
+  assertPropertyAccess(session, property.id);
+
   const number = await nextProposalNumber(data.propertyId);
 
   const proposal = await prisma.proposal.create({
@@ -88,6 +91,9 @@ export async function updateProposalStatus(id: string, status: ProposalStatus) {
   requirePermission(session.user.role, "crm:manage");
 
   const existing = await prisma.proposal.findUniqueOrThrow({ where: { id }, include: { property: true } });
+  assertCompanyAccess(session, existing.property.companyId);
+  assertPropertyAccess(session, existing.propertyId);
+
   const proposal = await prisma.proposal.update({ where: { id }, data: { status } });
 
   await recordAudit({

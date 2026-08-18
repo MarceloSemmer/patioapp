@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { PageHeader } from "@/components/layout/page-header";
 import { Breadcrumbs } from "@/components/layout/breadcrumbs";
 import { roleHasPermission } from "@/lib/permissions";
+import { resolveFileUrl } from "@/lib/storage";
 import { FloorPlanManager } from "./floor-plan-manager";
 
 export default async function FloorPlanPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,11 +36,15 @@ export default async function FloorPlanPage({ params }: { params: Promise<{ id: 
 
   const canManage = roleHasPermission(session.user.role, "property:manage");
 
+  const floorPlansWithResolvedUrls = await Promise.all(
+    floorPlans.map(async (fp) => ({ ...fp, imageUrl: await resolveFileUrl(fp.imageUrl) })),
+  );
+
   return (
     <div>
       <Breadcrumbs items={[{ label: "Empreendimentos", href: "/empreendimentos" }, { label: property.name, href: `/empreendimentos/${id}` }, { label: "Planta interativa" }]} />
       <PageHeader title="Planta interativa" description={property.name} />
-      <FloorPlanManager propertyId={id} floorPlans={floorPlans} units={units} canManage={canManage} />
+      <FloorPlanManager propertyId={id} floorPlans={floorPlansWithResolvedUrls} units={units} canManage={canManage} />
     </div>
   );
 }

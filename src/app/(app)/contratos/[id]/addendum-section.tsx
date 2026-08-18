@@ -92,7 +92,7 @@ export function AddendumSection({ contractId, addendums, canManage }: { contract
                 <div>
                   <Label>Documento do aditivo</Label>
                   <div className="mt-1">
-                    <FileUpload category="contracts" onUploaded={(url) => setFileUrl(url)} />
+                    <FileUpload category="contracts" onUploaded={(key) => setFileUrl(key)} />
                     {fileUrl && <span className="ml-2 text-xs text-muted-foreground">Enviado ✓</span>}
                   </div>
                 </div>

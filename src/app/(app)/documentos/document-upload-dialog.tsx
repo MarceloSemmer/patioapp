@@ -152,7 +152,7 @@ export function DocumentUploadDialog({ companies, properties }: { companies: Com
             <div className="col-span-2">
               <Label>Arquivo</Label>
               <div className="mt-1 flex items-center gap-2">
-                <FileUpload category="documents" onUploaded={(url, name) => { setFileUrl(url); setFileName(name); }} />
+                <FileUpload category="documents" onUploaded={(key, _url, name) => { setFileUrl(key); setFileName(name); }} />
                 {fileUrl && <span className="text-xs text-muted-foreground">{fileName} ✓</span>}
               </div>
             </div>

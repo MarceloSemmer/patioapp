@@ -12,7 +12,8 @@ export function FileUpload({
   label = "Enviar arquivo",
 }: {
   category: string;
-  onUploaded: (url: string, fileName: string) => void;
+  /** `key` é o valor a persistir no banco; `url` serve para pré-visualização imediata. */
+  onUploaded: (key: string, url: string, fileName: string) => void;
   accept?: string;
   label?: string;
 }) {
@@ -30,7 +31,7 @@ export function FileUpload({
       const res = await fetch("/api/upload", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Falha no upload.");
-      onUploaded(data.url, file.name);
+      onUploaded(data.key, data.url, file.name);
       toast.success("Arquivo enviado.");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Falha no upload.");

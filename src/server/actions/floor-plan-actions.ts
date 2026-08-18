@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess, assertPropertyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -19,6 +19,9 @@ export async function createFloorPlan(input: z.infer<typeof createFloorPlanSchem
   const data = createFloorPlanSchema.parse(input);
 
   const property = await prisma.property.findUniqueOrThrow({ where: { id: data.propertyId } });
+  assertCompanyAccess(session, property.companyId);
+  assertPropertyAccess(session, property.id);
+
   const floorPlan = await prisma.floorPlan.create({ data });
 
   await recordAudit({
@@ -48,6 +51,18 @@ export async function upsertFloorPlanArea(input: z.infer<typeof areaSchema>) {
   requirePermission(session.user.role, "property:manage");
   const data = areaSchema.parse(input);
 
+  const floorPlan = await prisma.floorPlan.findUniqueOrThrow({
+    where: { id: data.floorPlanId },
+    include: { property: true },
+  });
+  assertCompanyAccess(session, floorPlan.property.companyId);
+  assertPropertyAccess(session, floorPlan.propertyId);
+
+  const unit = await prisma.unit.findUniqueOrThrow({ where: { id: data.unitId } });
+  if (unit.propertyId !== floorPlan.propertyId) {
+    throw new Error("A unidade informada não pertence a este empreendimento.");
+  }
+
   const area = await prisma.floorPlanArea.upsert({
     where: { floorPlanId_unitId: { floorPlanId: data.floorPlanId, unitId: data.unitId } },
     update: { x: data.x, y: data.y, width: data.width, height: data.height },
@@ -62,6 +77,13 @@ export async function upsertFloorPlanArea(input: z.infer<typeof areaSchema>) {
 export async function deleteFloorPlanArea(id: string) {
   const session = await requireSession();
   requirePermission(session.user.role, "property:manage");
+
+  const existing = await prisma.floorPlanArea.findUniqueOrThrow({
+    where: { id },
+    include: { floorPlan: { include: { property: true } } },
+  });
+  assertCompanyAccess(session, existing.floorPlan.property.companyId);
+  assertPropertyAccess(session, existing.floorPlan.propertyId);
 
   const area = await prisma.floorPlanArea.delete({
     where: { id },

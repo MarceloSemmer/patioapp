@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess, assertPropertyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -37,6 +37,8 @@ export async function generateChargesForContract(input: z.infer<typeof generateS
     where: { id: data.contractId },
     include: { property: true, charges: { select: { competence: true } } },
   });
+  assertCompanyAccess(session, contract.property.companyId);
+  assertPropertyAccess(session, contract.propertyId);
 
   const existingCompetences = new Set(contract.charges.map((c) => c.competence.toISOString().slice(0, 7)));
 
@@ -111,6 +113,8 @@ export async function registerChargePayment(input: z.infer<typeof paymentSchema>
     where: { id: data.chargeId },
     include: { contract: { include: { property: true } } },
   });
+  assertCompanyAccess(session, charge.contract.property.companyId);
+  assertPropertyAccess(session, charge.contract.propertyId);
 
   if (charge.status === "CANCELADA") {
     throw new Error("Não é possível registrar pagamento em uma cobrança cancelada.");
@@ -171,6 +175,8 @@ export async function cancelCharge(chargeId: string, reason: string) {
     where: { id: chargeId },
     include: { contract: { include: { property: true } } },
   });
+  assertCompanyAccess(session, charge.contract.property.companyId);
+  assertPropertyAccess(session, charge.contract.propertyId);
 
   if (Number(charge.paidAmount) > 0) {
     throw new Error("Não é possível cancelar uma cobrança que já possui pagamentos. Estorne os pagamentos primeiro.");
@@ -198,6 +204,13 @@ export async function getChargePayments(chargeId: string) {
   const session = await requireSession();
   requirePermission(session.user.role, "finance:view");
 
+  const charge = await prisma.charge.findUniqueOrThrow({
+    where: { id: chargeId },
+    include: { contract: { include: { property: true } } },
+  });
+  assertCompanyAccess(session, charge.contract.property.companyId);
+  assertPropertyAccess(session, charge.contract.propertyId);
+
   const allocations = await prisma.paymentAllocation.findMany({
     where: { chargeId },
     include: { payment: true },
@@ -223,6 +236,12 @@ export async function reversePayment(paymentId: string, reason: string) {
     where: { id: paymentId },
     include: { allocations: { include: { charge: { include: { contract: { include: { property: true } } } } } } },
   });
+
+  const firstAllocationForAuth = payment.allocations[0];
+  if (firstAllocationForAuth) {
+    assertCompanyAccess(session, firstAllocationForAuth.charge.contract.property.companyId);
+    assertPropertyAccess(session, firstAllocationForAuth.charge.contract.propertyId);
+  }
 
   if (payment.isReversed) {
     throw new Error("Este pagamento já foi estornado.");

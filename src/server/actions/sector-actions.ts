@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess, assertPropertyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -25,6 +25,9 @@ export async function createSector(input: SectorInput) {
   const data = sectorSchema.parse(input);
 
   const property = await prisma.property.findUniqueOrThrow({ where: { id: data.propertyId } });
+  assertCompanyAccess(session, property.companyId);
+  assertPropertyAccess(session, property.id);
+
   const sector = await prisma.sector.create({ data });
 
   await recordAudit({
@@ -46,6 +49,9 @@ export async function updateSector(id: string, input: SectorInput) {
   const data = sectorSchema.parse(input);
 
   const existing = await prisma.sector.findUniqueOrThrow({ where: { id }, include: { property: true } });
+  assertCompanyAccess(session, existing.property.companyId);
+  assertPropertyAccess(session, existing.propertyId);
+
   const sector = await prisma.sector.update({ where: { id }, data });
 
   await recordAudit({
@@ -67,6 +73,9 @@ export async function deleteSector(id: string) {
   requirePermission(session.user.role, "property:manage");
 
   const existing = await prisma.sector.findUniqueOrThrow({ where: { id }, include: { property: true } });
+  assertCompanyAccess(session, existing.property.companyId);
+  assertPropertyAccess(session, existing.propertyId);
+
   const unitsCount = await prisma.unit.count({ where: { sectorId: id, deletedAt: null } });
   if (unitsCount > 0) {
     throw new Error("Não é possível excluir um setor que possui unidades cadastradas.");

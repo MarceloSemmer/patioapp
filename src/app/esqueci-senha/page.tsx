@@ -50,10 +50,10 @@ export default function ForgotPasswordPage() {
                   <p>{result.message}</p>
                   {!result.emailConfigured && (
                     <p className="text-xs text-muted-foreground">
-                      Nenhum provedor de e-mail está configurado neste ambiente (variáveis SMTP_HOST ou
-                      RESEND_API_KEY ausentes). Por isso, o link abaixo é exibido diretamente — apenas para uso
-                      local/demonstração. Em produção, configure um provedor para que o link seja enviado por
-                      e-mail e nunca exibido em tela.
+                      Nenhum provedor de e-mail está configurado neste ambiente (variável RESEND_API_KEY ausente).
+                      Por isso, o link abaixo é exibido diretamente — apenas para uso local/demonstração. Em
+                      produção, configure a chave da Resend para que o link seja enviado por e-mail e nunca exibido
+                      em tela.
                     </p>
                   )}
                   {result.devResetUrl && (

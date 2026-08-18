@@ -5,16 +5,14 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { requireSession } from "@/lib/session";
 import { z } from "zod";
-
-const EMAIL_CONFIGURED = Boolean(process.env.SMTP_HOST || process.env.RESEND_API_KEY);
+import { sendEmail, passwordResetEmail, emailConfigured } from "@/lib/email";
 
 /**
- * Solicita redefinição de senha. Este ambiente de demonstração não possui
- * um provedor de e-mail configurado (SMTP_HOST ou RESEND_API_KEY ausentes),
- * então — em vez de simular um envio que não ocorre — o link de redefinição
- * é retornado diretamente para exibição em tela, apenas para uso local/demo.
- * Em produção, com um provedor configurado, o link deve ser enviado por e-mail
- * e nunca exibido na resposta.
+ * Solicita redefinição de senha. Quando RESEND_API_KEY está configurado, o
+ * e-mail é enviado de verdade e nenhum link é retornado ao chamador. Sem
+ * provedor configurado, o link é retornado diretamente para exibição em
+ * tela — apenas para uso local/demonstração. Nunca fingimos um envio que
+ * não ocorreu.
  */
 export async function requestPasswordReset(email: string) {
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
@@ -24,7 +22,7 @@ export async function requestPasswordReset(email: string) {
     ok: true,
     message: "Se o e-mail existir em nossa base, um link de redefinição foi gerado.",
     devResetUrl: null as string | null,
-    emailConfigured: EMAIL_CONFIGURED,
+    emailConfigured,
   };
 
   if (!user || !user.isActive || user.deletedAt) {
@@ -44,9 +42,17 @@ export async function requestPasswordReset(email: string) {
 
   const resetUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/redefinir-senha/${token}`;
 
-  if (EMAIL_CONFIGURED) {
-    // Estrutura preparada para integração futura com provedor de e-mail.
-    // TODO: enviar `resetUrl` via provedor configurado (SMTP ou Resend).
+  if (emailConfigured) {
+    const result = await sendEmail({
+      to: user.email,
+      subject: "Redefinição de senha",
+      html: passwordResetEmail({ resetUrl }),
+    });
+    if (!result.sent) {
+      // Provedor configurado mas o envio falhou: ainda assim devolvemos o
+      // link para não deixar o usuário sem alternativa nenhuma.
+      return { ...genericResult, message: `Não foi possível enviar o e-mail: ${result.error}`, devResetUrl: resetUrl };
+    }
     return { ...genericResult, devResetUrl: null };
   }
 

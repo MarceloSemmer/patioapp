@@ -173,7 +173,7 @@ function NewFloorPlanForm({ propertyId, compact }: { propertyId: string; compact
           <div>
             <Label>Imagem (PNG, JPG ou PDF)</Label>
             <div className="mt-1 flex items-center gap-2">
-              <FileUpload category="floor-plans" onUploaded={(url) => setImageUrl(url)} />
+              <FileUpload category="floor-plans" onUploaded={(key) => setImageUrl(key)} />
               {imageUrl && <span className="text-xs text-muted-foreground">Arquivo enviado ✓</span>}
             </div>
           </div>

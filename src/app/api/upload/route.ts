@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
-import crypto from "crypto";
 import { auth } from "@/lib/auth";
+import { storeFile } from "@/lib/storage";
 
 /**
- * Upload local de arquivos (imagens de plantas, documentos, fotos de unidades).
+ * Upload de arquivos (imagens de plantas, documentos, fotos de unidades).
  *
- * Em produção com Supabase configurado, este endpoint deve ser substituído
- * pelo upload direto para o Supabase Storage (bucket privado + URLs assinadas
- * temporárias). Nesta versão de demonstração, os arquivos são salvos em
- * `public/uploads/<categoria>/` no próprio servidor, o que É adequado para
- * rodar localmente mas NÃO deve ser usado em produção (disco efêmero na
- * Vercel, sem controle de acesso por usuário).
+ * Usa o Supabase Storage (bucket privado + URL assinada) quando
+ * NEXT_PUBLIC_SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY estão configurados
+ * (ver src/lib/storage.ts); caso contrário, grava em `public/uploads/` no
+ * próprio servidor — modo adequado apenas para desenvolvimento local.
  */
 
 const ALLOWED_TYPES = new Set([
@@ -45,11 +41,11 @@ export async function POST(req: Request) {
   }
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const ext = path.extname(file.name).toLowerCase() || "";
-  const fileName = `${crypto.randomUUID()}${ext}`;
-  const dir = path.join(process.cwd(), "public", "uploads", category);
-  await mkdir(dir, { recursive: true });
-  await writeFile(path.join(dir, fileName), bytes);
 
-  return NextResponse.json({ url: `/uploads/${category}/${fileName}` });
+  try {
+    const stored = await storeFile({ category, fileName: file.name, bytes, contentType: file.type });
+    return NextResponse.json({ key: stored.key, url: stored.url });
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : "Falha no upload." }, { status: 500 });
+  }
 }

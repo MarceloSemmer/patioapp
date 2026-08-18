@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess, assertPropertyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -82,6 +82,8 @@ export async function createContract(input: ContractInput) {
   const data = contractSchema.parse(input);
 
   const property = await prisma.property.findUniqueOrThrow({ where: { id: data.propertyId } });
+  assertCompanyAccess(session, property.companyId);
+  assertPropertyAccess(session, property.id);
 
   await assertNoConflict(data.unitIds, data.startDate, data.endDate);
 
@@ -150,6 +152,8 @@ export async function changeContractStatus(contractId: string, status: ContractS
     where: { id: contractId },
     include: { property: true, units: { include: { unit: true } } },
   });
+  assertCompanyAccess(session, existing.property.companyId);
+  assertPropertyAccess(session, existing.propertyId);
 
   if (OCCUPYING_CONTRACT_STATUSES.includes(status)) {
     await assertNoConflict(
@@ -219,6 +223,10 @@ export async function addContractAddendum(input: z.infer<typeof addendumSchema>)
   const session = await requireSession();
   requirePermission(session.user.role, "contract:manage");
   const data = addendumSchema.parse(input);
+
+  const contract = await prisma.contract.findUniqueOrThrow({ where: { id: data.contractId }, include: { property: true } });
+  assertCompanyAccess(session, contract.property.companyId);
+  assertPropertyAccess(session, contract.propertyId);
 
   const addendum = await prisma.contractAddendum.create({ data });
   revalidatePath(`/contratos/${data.contractId}`);

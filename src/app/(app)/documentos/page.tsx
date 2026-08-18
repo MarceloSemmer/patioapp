@@ -8,6 +8,7 @@ import { FolderKanban } from "lucide-react";
 import { documentTypeLabels } from "@/lib/labels";
 import { formatDate, formatDateTime } from "@/lib/format";
 import { roleHasPermission } from "@/lib/permissions";
+import { resolveFileUrl } from "@/lib/storage";
 import { DocumentUploadDialog } from "./document-upload-dialog";
 import { DocumentDownloadLink } from "./document-download-link";
 
@@ -47,6 +48,9 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
 
   const canManage = roleHasPermission(session.user.role, "document:manage");
   const now = new Date();
+  const documentUrls = new Map(
+    await Promise.all(documents.map(async (doc) => [doc.id, await resolveFileUrl(doc.fileUrl)] as const)),
+  );
 
   return (
     <div>
@@ -94,7 +98,7 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
                       )}
                     </TableCell>
                     <TableCell className="text-right">
-                      <DocumentDownloadLink documentId={doc.id} fileUrl={doc.fileUrl} />
+                      <DocumentDownloadLink documentId={doc.id} fileUrl={documentUrls.get(doc.id) ?? doc.fileUrl} />
                     </TableCell>
                   </TableRow>
                 );

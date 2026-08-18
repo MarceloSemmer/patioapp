@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -25,6 +25,15 @@ export async function createOwner(input: OwnerInput) {
   const session = await requireSession();
   requirePermission(session.user.role, "owner:manage");
   const data = ownerSchema.parse(input);
+  assertCompanyAccess(session, data.companyId);
+
+  if (data.unitIds.length > 0) {
+    const units = await prisma.unit.findMany({ where: { id: { in: data.unitIds } }, include: { property: true } });
+    const foreign = units.find((u) => u.property.companyId !== data.companyId);
+    if (foreign) {
+      throw new Error("Uma ou mais unidades selecionadas não pertencem à empresa informada.");
+    }
+  }
 
   const owner = await prisma.owner.create({
     data: {

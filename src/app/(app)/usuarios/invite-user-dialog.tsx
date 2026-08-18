@@ -36,6 +36,8 @@ export function InviteUserDialog({ companies, properties }: { companies: Option[
   const [propertyIds, setPropertyIds] = useState<string[]>([]);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
   const [emailConfigured, setEmailConfigured] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
 
   const availableProperties = properties.filter((p) => companyIds.includes(p.companyId));
 
@@ -51,6 +53,8 @@ export function InviteUserDialog({ companies, properties }: { companies: Option[
       toast.success("Usuário criado.");
       setInviteUrl(result.inviteUrl);
       setEmailConfigured(result.emailConfigured);
+      setEmailError(result.emailError ?? null);
+      setSubmitted(true);
       router.refresh();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Não foi possível criar o usuário.");
@@ -67,6 +71,8 @@ export function InviteUserDialog({ companies, properties }: { companies: Option[
       setCompanyIds([]);
       setPropertyIds([]);
       setInviteUrl(null);
+      setEmailError(null);
+      setSubmitted(false);
     }
   }
 
@@ -81,15 +87,16 @@ export function InviteUserDialog({ companies, properties }: { companies: Option[
         <DialogHeader>
           <DialogTitle>Convidar usuário</DialogTitle>
         </DialogHeader>
-        {inviteUrl !== null || emailConfigured ? (
+        {submitted ? (
           <div className="space-y-3">
-            {emailConfigured ? (
+            {emailConfigured && !emailError ? (
               <p className="text-sm text-muted-foreground">Um e-mail de convite foi enviado para {email}.</p>
             ) : (
               <>
                 <p className="text-sm text-muted-foreground">
-                  Nenhum provedor de e-mail está configurado neste ambiente. Compartilhe manualmente o link abaixo para o
-                  usuário definir a senha (apenas para uso local/demonstração):
+                  {emailError
+                    ? `Não foi possível enviar o e-mail (${emailError}). Compartilhe manualmente o link abaixo para o usuário definir a senha:`
+                    : "Nenhum provedor de e-mail está configurado neste ambiente. Compartilhe manualmente o link abaixo para o usuário definir a senha (apenas para uso local/demonstração):"}
                 </p>
                 <p className="break-all rounded-md border bg-muted/50 p-2 text-xs">{inviteUrl}</p>
               </>

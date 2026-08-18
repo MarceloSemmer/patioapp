@@ -2,15 +2,14 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { UserRole } from "@prisma/client";
-
-const EMAIL_CONFIGURED = Boolean(process.env.SMTP_HOST || process.env.RESEND_API_KEY);
+import { sendEmail, inviteUserEmail, emailConfigured } from "@/lib/email";
 
 const userSchema = z.object({
   name: z.string().min(2, "Informe o nome."),
@@ -26,10 +25,11 @@ const updateUserSchema = userSchema.omit({ email: true });
 export type UpdateUserInput = z.infer<typeof updateUserSchema>;
 
 /**
- * Cria um usuário e convida-o por e-mail. Sem provedor de e-mail configurado
- * neste ambiente de demonstração, o link de definição de senha é retornado
- * diretamente para exibição em tela (nunca "enviado" de fato) — mesma lógica
- * de `requestPasswordReset`.
+ * Cria um usuário e convida-o por e-mail. Quando RESEND_API_KEY está
+ * configurado, o e-mail de convite é enviado de verdade. Sem provedor
+ * configurado, o link de definição de senha é retornado diretamente para
+ * exibição em tela (nunca "enviado" de fato) — mesma lógica de
+ * `requestPasswordReset`.
  */
 export async function inviteUser(input: UserInput) {
   const session = await requireSession();
@@ -38,6 +38,21 @@ export async function inviteUser(input: UserInput) {
 
   if (session.user.role !== "SUPERADMIN" && data.role === "SUPERADMIN") {
     throw new Error("Apenas um superadministrador pode criar outro superadministrador.");
+  }
+  if (session.user.role !== "SUPERADMIN") {
+    if (data.companyIds.length === 0) {
+      throw new Error("Selecione ao menos uma empresa para o novo usuário.");
+    }
+    for (const companyId of data.companyIds) {
+      assertCompanyAccess(session, companyId);
+    }
+  }
+  if (data.propertyIds.length > 0) {
+    const properties = await prisma.property.findMany({ where: { id: { in: data.propertyIds } } });
+    const foreign = properties.find((p) => !data.companyIds.includes(p.companyId));
+    if (foreign) {
+      throw new Error("Um empreendimento selecionado não pertence a nenhuma das empresas escolhidas.");
+    }
   }
 
   const existing = await prisma.user.findUnique({ where: { email: data.email.toLowerCase().trim() } });
@@ -74,7 +89,17 @@ export async function inviteUser(input: UserInput) {
   revalidatePath("/usuarios");
 
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/redefinir-senha/${resetToken}`;
-  return { user, inviteUrl: EMAIL_CONFIGURED ? null : inviteUrl, emailConfigured: EMAIL_CONFIGURED };
+
+  if (emailConfigured) {
+    const result = await sendEmail({
+      to: user.email,
+      subject: `Convite — ${data.name}`,
+      html: inviteUserEmail({ name: data.name, inviteUrl }),
+    });
+    return { user, inviteUrl: result.sent ? null : inviteUrl, emailConfigured, emailError: result.sent ? null : result.error };
+  }
+
+  return { user, inviteUrl, emailConfigured, emailError: null };
 }
 
 export async function updateUserRoleAndAccess(userId: string, input: UpdateUserInput) {
@@ -82,7 +107,30 @@ export async function updateUserRoleAndAccess(userId: string, input: UpdateUserI
   requirePermission(session.user.role, "user:manage");
   const data = updateUserSchema.parse(input);
 
-  const existing = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
+  const existing = await prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { companies: true } });
+
+  if (session.user.role !== "SUPERADMIN") {
+    if (existing.role === "SUPERADMIN" || data.role === "SUPERADMIN") {
+      throw new Error("Apenas um superadministrador pode gerenciar contas de superadministrador.");
+    }
+    const targetIsAccessible = existing.companies.some((c) => session.user.companyIds.includes(c.companyId));
+    if (!targetIsAccessible) {
+      throw new Error("Você não tem acesso a este usuário.");
+    }
+    if (data.companyIds.length === 0) {
+      throw new Error("Selecione ao menos uma empresa para o usuário.");
+    }
+    for (const companyId of data.companyIds) {
+      assertCompanyAccess(session, companyId);
+    }
+  }
+  if (data.propertyIds.length > 0) {
+    const properties = await prisma.property.findMany({ where: { id: { in: data.propertyIds } } });
+    const foreign = properties.find((p) => !data.companyIds.includes(p.companyId));
+    if (foreign) {
+      throw new Error("Um empreendimento selecionado não pertence a nenhuma das empresas escolhidas.");
+    }
+  }
 
   await prisma.$transaction([
     prisma.user.update({ where: { id: userId }, data: { name: data.name, role: data.role } }),
@@ -107,6 +155,17 @@ export async function updateUserRoleAndAccess(userId: string, input: UpdateUserI
 export async function toggleUserActive(userId: string, isActive: boolean) {
   const session = await requireSession();
   requirePermission(session.user.role, "user:manage");
+
+  if (session.user.role !== "SUPERADMIN") {
+    const existing = await prisma.user.findUniqueOrThrow({ where: { id: userId }, include: { companies: true } });
+    if (existing.role === "SUPERADMIN") {
+      throw new Error("Apenas um superadministrador pode gerenciar contas de superadministrador.");
+    }
+    const targetIsAccessible = existing.companies.some((c) => session.user.companyIds.includes(c.companyId));
+    if (!targetIsAccessible) {
+      throw new Error("Você não tem acesso a este usuário.");
+    }
+  }
 
   await prisma.user.update({ where: { id: userId }, data: { isActive } });
 

@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -43,10 +43,7 @@ export async function createProperty(input: PropertyInput) {
   const session = await requireSession();
   requirePermission(session.user.role, "property:manage");
   const data = propertySchema.parse(input);
-
-  if (session.user.role !== "SUPERADMIN" && !session.user.companyIds.includes(data.companyId)) {
-    throw new Error("Você não tem acesso a esta empresa.");
-  }
+  assertCompanyAccess(session, data.companyId);
 
   const property = await prisma.property.create({
     data: { ...data, email: data.email || null },
@@ -71,9 +68,8 @@ export async function updateProperty(id: string, input: PropertyInput) {
   const data = propertySchema.parse(input);
 
   const existing = await prisma.property.findUniqueOrThrow({ where: { id } });
-  if (session.user.role !== "SUPERADMIN" && !session.user.companyIds.includes(existing.companyId)) {
-    throw new Error("Você não tem acesso a este empreendimento.");
-  }
+  assertCompanyAccess(session, existing.companyId);
+  assertCompanyAccess(session, data.companyId);
 
   const property = await prisma.property.update({
     where: { id },
@@ -100,6 +96,8 @@ export async function changePropertyStatus(id: string, status: PropertyStatus) {
   requirePermission(session.user.role, "property:manage");
 
   const existing = await prisma.property.findUniqueOrThrow({ where: { id } });
+  assertCompanyAccess(session, existing.companyId);
+
   const property = await prisma.property.update({ where: { id }, data: { status } });
 
   await recordAudit({
