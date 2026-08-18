@@ -504,8 +504,6 @@ implementado, para não superestimar o entregável:
 - **Índices econômicos (IGP-M/IPCA/INPC)**: tabela de registro manual
   pronta, sem integração automática com fonte oficial (FGV/IBGE) — por
   desenho, para não inventar valores de índice.
-- **Kanban de CRM/manutenção**: movimentação por seleção/botões, não por
-  arraste (drag-and-drop) — funcional, mas menos fluido visualmente.
 - **Autenticação em dois fatores**: mencionada no prompt como "opção
   futura" — não implementada nesta versão.
 - **TanStack Table**: instalada como dependência, mas as tabelas atuais
@@ -516,17 +514,14 @@ implementado, para não superestimar o entregável:
 
 ## Próximas evoluções
 
-1. Migrar upload de arquivos para Supabase Storage com URLs assinadas.
-2. Conectar um provedor de e-mail (Resend/SMTP) para convites e recuperação
-   de senha, e depois WhatsApp/SMS/push para a central de notificações.
-3. Implementar a UI de vistorias/checklists sobre o modelo de dados já
-   existente.
-4. Editor de planta interativa com arraste (drag) em vez de desenho manual
+1. Editor de planta interativa com arraste (drag) em vez de desenho manual
    de retângulo.
-5. Drag-and-drop no CRM e no Kanban de manutenção.
-6. Integração automática de índices econômicos (IGP-M/IPCA/INPC) com fonte
+2. Conectar de fato um provedor de WhatsApp/SMS/push para a central de
+   notificações (e-mail já está integrado ao Resend, pendente apenas de
+   credenciais reais — ver [Limitações conhecidas](#limitações-conhecidas)).
+3. Integração automática de índices econômicos (IGP-M/IPCA/INPC) com fonte
    oficial.
-7. Autenticação em dois fatores.
-8. Job agendado (cron / Supabase Edge Function) para sincronizar cobranças
+4. Autenticação em dois fatores.
+5. Job agendado (cron / Supabase Edge Function) para sincronizar cobranças
    vencidas e gerar notificações, hoje calculado sob demanda ao abrir as
    telas correspondentes.
