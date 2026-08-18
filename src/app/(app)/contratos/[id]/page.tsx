@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { contractStatusColors, contractStatusLabels, adjustmentIndexLabels, guaranteeTypeLabels } from "@/lib/labels";
 import { formatCurrency, formatDate } from "@/lib/format";
 import { roleHasPermission } from "@/lib/permissions";
+import { resolveFileUrl } from "@/lib/storage";
 import { ContractStatusActions } from "./contract-status-actions";
 import { AddendumSection } from "./addendum-section";
 import { GenerateChargesDialog } from "../../financeiro/generate-charges-dialog";
@@ -34,6 +35,10 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
   const canManage = roleHasPermission(session.user.role, "contract:manage");
   const canViewFinance = roleHasPermission(session.user.role, "finance:view");
 
+  const addendumsWithResolvedUrls = await Promise.all(
+    contract.addendums.map(async (a) => ({ ...a, fileUrl: a.fileUrl ? await resolveFileUrl(a.fileUrl) : null })),
+  );
+
   const monthlyTotal =
     Number(contract.initialValue) + Number(contract.condoFee ?? 0) + Number(contract.iptuFee ?? 0) + Number(contract.promoFundFee ?? 0) + Number(contract.otherFees ?? 0);
 
@@ -46,6 +51,11 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
         actions={
           <>
             <Badge variant={contractStatusColors[contract.status]}>{contractStatusLabels[contract.status]}</Badge>
+            {roleHasPermission(session.user.role, "inspection:view") && (
+              <Button variant="outline" asChild>
+                <Link href={`/vistorias?empreendimento=${contract.property.id}`}>Vistorias</Link>
+              </Button>
+            )}
             {canManage && <ContractStatusActions contractId={contract.id} status={contract.status} />}
           </>
         }
@@ -74,7 +84,7 @@ export default async function ContractDetailPage({ params }: { params: Promise<{
       )}
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <AddendumSection contractId={contract.id} addendums={contract.addendums} canManage={canManage} />
+        <AddendumSection contractId={contract.id} addendums={addendumsWithResolvedUrls} canManage={canManage} />
 
         <section className="rounded-lg border bg-card p-4">
           <h3 className="mb-3 text-sm font-medium">Reajustes aplicados</h3>

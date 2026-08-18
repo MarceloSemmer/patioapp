@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -41,10 +41,7 @@ export async function createTenant(input: TenantInput) {
   const session = await requireSession();
   requirePermission(session.user.role, "tenant:manage");
   const data = tenantSchema.parse(input);
-
-  if (session.user.role !== "SUPERADMIN" && !session.user.companyIds.includes(data.companyId)) {
-    throw new Error("Você não tem acesso a esta empresa.");
-  }
+  assertCompanyAccess(session, data.companyId);
 
   const existing = await prisma.tenant.findFirst({
     where: { companyId: data.companyId, document: onlyDigits(data.document) },
@@ -76,6 +73,11 @@ export async function updateTenant(id: string, input: TenantInput) {
   const data = tenantSchema.parse(input);
 
   const existing = await prisma.tenant.findUniqueOrThrow({ where: { id } });
+  assertCompanyAccess(session, existing.companyId);
+  if (data.companyId !== existing.companyId) {
+    throw new Error("Não é possível mover um locatário para outra empresa.");
+  }
+
   const tenant = await prisma.tenant.update({
     where: { id },
     data: { ...data, document: onlyDigits(data.document), email: data.email || null },
@@ -109,6 +111,9 @@ export async function addTenantContact(input: z.infer<typeof contactSchema>) {
   const session = await requireSession();
   requirePermission(session.user.role, "tenant:manage");
   const data = contactSchema.parse(input);
+
+  const tenant = await prisma.tenant.findUniqueOrThrow({ where: { id: data.tenantId } });
+  assertCompanyAccess(session, tenant.companyId);
 
   const contact = await prisma.tenantContact.create({ data });
   revalidatePath(`/locatarios/${data.tenantId}`);
@@ -158,6 +163,10 @@ export async function updateOwnTenantContact(input: z.infer<typeof selfUpdateSch
 export async function removeTenantContact(id: string) {
   const session = await requireSession();
   requirePermission(session.user.role, "tenant:manage");
+
+  const existing = await prisma.tenantContact.findUniqueOrThrow({ where: { id }, include: { tenant: true } });
+  assertCompanyAccess(session, existing.tenant.companyId);
+
   const contact = await prisma.tenantContact.delete({ where: { id } });
   revalidatePath(`/locatarios/${contact.tenantId}`);
 }

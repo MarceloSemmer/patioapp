@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess, assertPropertyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -35,6 +35,9 @@ export async function createTicket(input: TicketInput) {
   const data = ticketSchema.parse(input);
 
   const property = await prisma.property.findUniqueOrThrow({ where: { id: data.propertyId } });
+  assertCompanyAccess(session, property.companyId);
+  assertPropertyAccess(session, property.id);
+
   const protocol = await nextProtocol();
 
   const ticket = await prisma.maintenanceTicket.create({
@@ -114,6 +117,8 @@ export async function updateTicketStatus(ticketId: string, status: TicketStatus,
   requirePermission(session.user.role, "maintenance:manage");
 
   const existing = await prisma.maintenanceTicket.findUniqueOrThrow({ where: { id: ticketId }, include: { property: true } });
+  assertCompanyAccess(session, existing.property.companyId);
+  assertPropertyAccess(session, existing.propertyId);
 
   const ticket = await prisma.$transaction(async (tx) => {
     const updated = await tx.maintenanceTicket.update({
@@ -150,6 +155,10 @@ export async function assignTicket(input: z.infer<typeof assignSchema>) {
   const session = await requireSession();
   requirePermission(session.user.role, "maintenance:manage");
   const data = assignSchema.parse(input);
+
+  const existing = await prisma.maintenanceTicket.findUniqueOrThrow({ where: { id: data.ticketId }, include: { property: true } });
+  assertCompanyAccess(session, existing.property.companyId);
+  assertPropertyAccess(session, existing.propertyId);
 
   const ticket = await prisma.maintenanceTicket.update({
     where: { id: data.ticketId },

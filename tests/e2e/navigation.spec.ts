@@ -19,6 +19,7 @@ test.describe("Navegação pelas principais telas (smoke test)", () => {
     { path: "/financeiro", heading: "Financeiro" },
     { path: "/financeiro/inadimplencia", heading: "Régua de inadimplência" },
     { path: "/manutencao", heading: "Manutenção" },
+    { path: "/vistorias", heading: "Vistorias" },
     { path: "/documentos", heading: "Documentos" },
     { path: "/relatorios", heading: "Relatórios" },
     { path: "/notificacoes", heading: "Notificações" },

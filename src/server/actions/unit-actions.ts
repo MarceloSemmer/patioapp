@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { requireSession } from "@/lib/session";
+import { requireSession, assertCompanyAccess, assertPropertyAccess } from "@/lib/session";
 import { requirePermission } from "@/lib/permissions";
 import { recordAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -50,6 +50,9 @@ export async function createUnit(input: UnitInput) {
   const data = unitSchema.parse(input);
 
   const property = await prisma.property.findUniqueOrThrow({ where: { id: data.propertyId } });
+  assertCompanyAccess(session, property.companyId);
+  assertPropertyAccess(session, property.id);
+
   const unit = await prisma.unit.create({ data });
 
   await prisma.unitStatusHistory.create({
@@ -76,6 +79,15 @@ export async function updateUnit(id: string, input: UnitInput) {
   const data = unitSchema.parse(input);
 
   const existing = await prisma.unit.findUniqueOrThrow({ where: { id }, include: { property: true } });
+  assertCompanyAccess(session, existing.property.companyId);
+  assertPropertyAccess(session, existing.propertyId);
+
+  if (data.propertyId !== existing.propertyId) {
+    const targetProperty = await prisma.property.findUniqueOrThrow({ where: { id: data.propertyId } });
+    assertCompanyAccess(session, targetProperty.companyId);
+    assertPropertyAccess(session, targetProperty.id);
+  }
+
   const unit = await prisma.unit.update({ where: { id }, data });
 
   await recordAudit({
@@ -105,6 +117,8 @@ export async function changeUnitStatus(input: z.infer<typeof statusChangeSchema>
   const data = statusChangeSchema.parse(input);
 
   const existing = await prisma.unit.findUniqueOrThrow({ where: { id: data.unitId }, include: { property: true } });
+  assertCompanyAccess(session, existing.property.companyId);
+  assertPropertyAccess(session, existing.propertyId);
 
   const unit = await prisma.$transaction(async (tx) => {
     const updated = await tx.unit.update({ where: { id: data.unitId }, data: { status: data.newStatus } });

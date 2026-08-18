@@ -29,6 +29,8 @@ export type Permission =
   | "maintenance:manage"
   | "document:view"
   | "document:manage"
+  | "inspection:view"
+  | "inspection:manage"
   | "report:view"
   | "settings:manage"
   | "audit:view"
@@ -57,6 +59,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "maintenance:manage",
     "document:view",
     "document:manage",
+    "inspection:view",
+    "inspection:manage",
     "report:view",
     "settings:manage",
     "audit:view",
@@ -83,6 +87,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "maintenance:manage",
     "document:view",
     "document:manage",
+    "inspection:view",
+    "inspection:manage",
     "report:view",
     "settings:manage",
     "audit:view",
@@ -104,6 +110,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "maintenance:manage",
     "document:view",
     "document:manage",
+    "inspection:view",
+    "inspection:manage",
     "report:view",
   ],
   FINANCEIRO: [
@@ -125,6 +133,8 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "maintenance:view",
     "maintenance:manage",
     "document:view",
+    "inspection:view",
+    "inspection:manage",
   ],
   CONSULTA: [
     "property:view",
@@ -134,6 +144,7 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "finance:view",
     "maintenance:view",
     "document:view",
+    "inspection:view",
     "report:view",
   ],
   LOCATARIO: [],

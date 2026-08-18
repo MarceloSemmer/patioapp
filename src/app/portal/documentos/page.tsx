@@ -7,6 +7,7 @@ import { FolderKanban, Download } from "lucide-react";
 import { documentTypeLabels } from "@/lib/labels";
 import { formatDate } from "@/lib/format";
 import { Button } from "@/components/ui/button";
+import { resolveFileUrl } from "@/lib/storage";
 
 export default async function PortalDocumentsPage() {
   const { tenant } = await requireTenantContext();
@@ -15,6 +16,9 @@ export default async function PortalDocumentsPage() {
     where: { tenantId: tenant.id },
     orderBy: { createdAt: "desc" },
   });
+  const documentUrls = new Map(
+    await Promise.all(documents.map(async (doc) => [doc.id, await resolveFileUrl(doc.fileUrl)] as const)),
+  );
 
   return (
     <div>
@@ -40,7 +44,7 @@ export default async function PortalDocumentsPage() {
                   <TableCell>{formatDate(doc.createdAt)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" asChild>
-                      <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar">
+                      <a href={documentUrls.get(doc.id) ?? doc.fileUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar">
                         <Download className="h-4 w-4" />
                       </a>
                     </Button>

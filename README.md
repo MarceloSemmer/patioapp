@@ -68,10 +68,11 @@ checagem de permissão no servidor — nunca apenas no cliente.
 | Notificações internas | ✅ | Geradas por regras de negócio (vencimentos, atrasos) |
 | Auditoria | ✅ | Somente leitura, ações críticas |
 | Portal do locatário | ✅ | Isolado por `tenantId`, dashboard, contrato, cobranças, documentos, chamados, dados |
-| Usuários e permissões | ✅ | Convite (com link exibido, sem SMTP), papéis, escopo por empresa/empreendimento |
-| Vistorias/checklists | ⚠️ Modelado, sem UI | Tabelas `inspections`/`inspection_items` no schema, tela ainda não implementada |
-| Comparação de unidades lado a lado | ⚠️ Não implementado | Ver "Limitações conhecidas" |
-| Envio real de e-mail/WhatsApp/SMS/push | ⚠️ Estrutura pronta, não conectado | Ver "Limitações conhecidas" |
+| Usuários e permissões | ✅ | Convite (via Resend se configurado, senão link exibido em tela), papéis, escopo por empresa/empreendimento |
+| Vistorias/checklists | ✅ | Entrada, saída, periódica, segurança etc.; checklist por item (conforme/não conforme/não se aplica), foto por item, laudo em PDF |
+| Comparação de unidades lado a lado | ✅ | Seleção múltipla (até 4) na listagem; área, valor, valor/m², localização e infraestrutura lado a lado |
+| Envio real de e-mail (convite/senha) | ⚠️ Integração pronta, não validada | Ativa via `RESEND_API_KEY`; nunca testada contra a API real — ver "Limitações conhecidas" |
+| WhatsApp/SMS/push | ⚠️ Não implementado | Fora do escopo desta versão |
 
 ## Tecnologias
 
@@ -102,14 +103,27 @@ ambiente de desenvolvimento não tem acesso a um projeto Supabase provisionado
   com hash bcrypt), sessão JWT. Migrar para Supabase Auth é possível
   futuramente, mas exigiria reescrever o fluxo de login/registro — não foi
   feito para manter o escopo entregável dentro do tempo disponível.
-- **Armazenamento de arquivos**: nesta versão, uploads (plantas, documentos,
-  fotos) são salvos em `public/uploads/` no próprio servidor via
-  `/api/upload`. **Isso funciona para rodar localmente, mas não deve ser
-  usado em produção** (disco efêmero em plataformas serverless como a
-  Vercel, sem controle de acesso por usuário). Para produção, o próximo
-  passo é substituir esse endpoint pelo upload direto ao Supabase Storage
-  (bucket privado + URLs assinadas temporárias) — a estrutura de dados
-  (`fileUrl`, `isPrivate`) já está pronta para isso.
+- **Armazenamento de arquivos**: `src/lib/storage.ts` implementa as duas
+  formas de armazenamento e escolhe automaticamente qual usar, sem exigir
+  mudança de código — apenas de variáveis de ambiente. Sem
+  `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` configurados
+  (situação padrão deste ambiente de demonstração, que não tem credenciais
+  de um provedor real), os uploads (plantas, documentos, fotos) são salvos
+  em `public/uploads/` no próprio servidor via `/api/upload` — **adequado
+  para rodar localmente, mas não para produção** (disco efêmero em
+  plataformas serverless como a Vercel). Assim que essas variáveis são
+  definidas, `storeFile()` passa a enviar para um bucket privado do
+  Supabase Storage e devolver URLs assinadas temporárias, sem qualquer
+  alteração nas telas ou nas Server Actions que chamam essa função — a
+  integração nunca foi testada contra um projeto Supabase real (nenhuma
+  credencial foi fornecida durante o desenvolvimento), então valide o fluxo
+  de upload/download em homologação antes de confiar nela em produção.
+- **E-mail transacional**: `src/lib/email.ts` segue o mesmo padrão —
+  convites de usuário e recuperação de senha são enviados via Resend quando
+  `RESEND_API_KEY` está definido; sem a chave, o link é exibido diretamente
+  em tela para o administrador (nunca "enviado" silenciosamente). Assim como
+  o Storage, essa integração está pronta no código mas não foi validada
+  contra a API real do Resend por falta de credenciais.
 
 ## Arquitetura
 
@@ -127,8 +141,27 @@ ambiente de desenvolvimento não tem acesso a um projeto Supabase provisionado
   importa a configuração completa do NextAuth, que depende de bcrypt/Prisma
   — APIs Node.js incompatíveis com Edge).
 - **Isolamento por empresa/empreendimento**: `src/lib/session.ts` calcula o
-  escopo (`companyScope`/`propertyScope`) a partir da sessão; toda consulta
-  Prisma nas páginas e nas server actions filtra por esse escopo.
+  escopo (`companyScope`/`propertyScope`) a partir da sessão para uso em
+  consultas (filtros `WHERE`), e expõe também os guardas
+  `assertCompanyAccess(session, companyId)` /
+  `assertPropertyAccess(session, propertyId)`, que lançam erro quando o
+  usuário autenticado tenta ler ou escrever um registro de uma empresa/
+  empreendimento fora do seu escopo (relevante sobretudo em escrita: uma
+  consulta com filtro pode simplesmente devolver menos linhas, mas um
+  `update`/`create` recebendo um ID de outra empresa via payload precisa de
+  uma checagem explícita, não apenas de um filtro). Todas as Server Actions
+  que criam ou alteram dados de empresa/empreendimento
+  (`src/server/actions/*.ts` — empreendimentos, setores, unidades,
+  locatários, propostas, contratos, cobranças/pagamentos, documentos,
+  chamados de manutenção, proprietários, usuários) chamam esses guardas antes
+  de tocar no banco, cobrindo tanto o ID recebido diretamente no payload
+  quanto IDs relacionados resolvidos a partir dele (ex.: criar uma cobrança
+  a partir do `contractId` recebido valida a empresa do contrato/
+  empreendimento associado, não apenas um campo solto de `companyId`). Essa
+  cobertura é validada por testes de integração dedicados em
+  `tests/integration/company-isolation.test.ts`, que tentam — e devem falhar
+  ao tentar — ler/escrever dados de outra empresa em empreendimentos,
+  financeiro, manutenção, documentos e propostas.
 - **Auditoria**: `src/lib/audit.ts` grava um registro em `audit_logs` a cada
   ação crítica (criação, alteração, exclusão lógica, mudança de status,
   aprovação, cancelamento, baixa financeira, estorno, reajuste, download de
@@ -397,8 +430,10 @@ com dois empreendimentos (**Pátio Tijuco** e **Pátio Oxford**), 5 setores, 22
 unidades em diferentes situações, 8 locatários, 10 leads em diferentes
 etapas do funil, 2 propostas, 10 contratos (ativos, próximo do vencimento e
 uma minuta), cobranças pagas/pendentes/vencidas, 5 chamados de manutenção em
-diferentes status, documentos de exemplo (incluindo uma planta interativa
-com unidades posicionadas) e notificação inicial. Veja o guia completo em
+diferentes status, 2 vistorias (uma de entrada já realizada com checklist
+preenchido, uma periódica agendada), documentos de exemplo (incluindo uma
+planta interativa com unidades posicionadas) e notificação inicial. Veja o
+guia completo em
 [`docs/admin-quickstart.md`](docs/admin-quickstart.md).
 
 **Estas credenciais e senhas simples existem apenas para uso local/demo.**
@@ -436,29 +471,39 @@ com dados reais.
 Sendo direto sobre o que **não** está pronto ou está apenas parcialmente
 implementado, para não superestimar o entregável:
 
-- **Envio real de e-mail/WhatsApp/SMS/push**: a estrutura de dados
-  (`NotificationType`, central de notificações internas) está pronta, mas
-  nenhum provedor está conectado. Convites de usuário e recuperação de senha
-  geram o link e o exibem em tela (claramente sinalizado como comportamento
-  de ambiente sem SMTP configurado) em vez de simular um envio que não
-  ocorre.
-- **Upload de arquivos em disco local**: adequado para rodar localmente,
-  **não é adequado para produção na Vercel** (filesystem efêmero). Precisa
-  ser trocado por Supabase Storage (ou S3-compatível) antes de produção real
-  — ver seção de Storage acima.
-- **Row Level Security do Postgres**: não está ativo (autenticação não é via
-  Supabase Auth nesta versão). O isolamento de dados é garantido na camada
-  de aplicação; `supabase/policies.sql` documenta as políticas de referência
-  para uma migração futura.
+- **Envio real de e-mail**: `src/lib/email.ts` integra com a API do Resend e
+  é ativado automaticamente quando `RESEND_API_KEY` está definido, mas essa
+  integração **nunca foi testada contra um provedor real** — nenhuma
+  credencial estava disponível durante o desenvolvimento (decisão explícita:
+  implementar pronto para ativar, sem esperar por credenciais). Sem a
+  chave, convites de usuário e recuperação de senha geram o link e o exibem
+  em tela (claramente sinalizado, nunca "enviados" silenciosamente). WhatsApp
+  /SMS/push não têm integração nenhuma implementada — a central de
+  notificações internas (`NotificationType`) cobre apenas o que aparece
+  dentro do próprio sistema.
+- **Upload de arquivos em disco local por padrão**: `src/lib/storage.ts` já
+  implementa o envio para Supabase Storage (bucket privado + URLs assinadas
+  temporárias), ativado automaticamente quando
+  `NEXT_PUBLIC_SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` estão definidos —
+  mas, pela mesma razão do e-mail, **nunca foi testado contra um bucket
+  real**. Sem essas variáveis (o padrão deste ambiente), os arquivos vão
+  para `public/uploads/`, o que funciona localmente mas **não é adequado
+  para produção na Vercel** (filesystem efêmero).
+- **Row Level Security do Postgres**: não está ativo — decisão deliberada
+  (autenticação não é via Supabase Auth nesta versão, e migrar exigiria
+  reescrever o fluxo de login com risco de regressão sem trazer proteção
+  adicional real, já que a aplicação usa uma única credencial de serviço do
+  Prisma). O isolamento de dados é garantido e reforçado na camada de
+  aplicação (`assertCompanyAccess`/`assertPropertyAccess` em
+  `src/lib/session.ts`, chamados em toda Server Action que cria ou altera
+  dados de empresa/empreendimento — ver seção Arquitetura acima), coberto por
+  testes de integração dedicados que tentam acessar dados de outra empresa e
+  esperam falha (`tests/integration/company-isolation.test.ts`).
+  `supabase/policies.sql` documenta as políticas RLS de referência caso o
+  projeto migre para Supabase Auth no futuro.
 - **Índices econômicos (IGP-M/IPCA/INPC)**: tabela de registro manual
   pronta, sem integração automática com fonte oficial (FGV/IBGE) — por
   desenho, para não inventar valores de índice.
-- **Vistorias/checklists**: modelo de dados completo (`inspections`,
-  `inspection_items`) mas sem tela de UI implementada.
-- **Comparação de unidades lado a lado**: não implementada (listagem,
-  filtros avançados e detalhamento individual estão completos).
-- **Kanban de CRM/manutenção**: movimentação por seleção/botões, não por
-  arraste (drag-and-drop) — funcional, mas menos fluido visualmente.
 - **Autenticação em dois fatores**: mencionada no prompt como "opção
   futura" — não implementada nesta versão.
 - **TanStack Table**: instalada como dependência, mas as tabelas atuais
@@ -469,17 +514,14 @@ implementado, para não superestimar o entregável:
 
 ## Próximas evoluções
 
-1. Migrar upload de arquivos para Supabase Storage com URLs assinadas.
-2. Conectar um provedor de e-mail (Resend/SMTP) para convites e recuperação
-   de senha, e depois WhatsApp/SMS/push para a central de notificações.
-3. Implementar a UI de vistorias/checklists sobre o modelo de dados já
-   existente.
-4. Editor de planta interativa com arraste (drag) em vez de desenho manual
+1. Editor de planta interativa com arraste (drag) em vez de desenho manual
    de retângulo.
-5. Drag-and-drop no CRM e no Kanban de manutenção.
-6. Integração automática de índices econômicos (IGP-M/IPCA/INPC) com fonte
+2. Conectar de fato um provedor de WhatsApp/SMS/push para a central de
+   notificações (e-mail já está integrado ao Resend, pendente apenas de
+   credenciais reais — ver [Limitações conhecidas](#limitações-conhecidas)).
+3. Integração automática de índices econômicos (IGP-M/IPCA/INPC) com fonte
    oficial.
-7. Autenticação em dois fatores.
-8. Job agendado (cron / Supabase Edge Function) para sincronizar cobranças
+4. Autenticação em dois fatores.
+5. Job agendado (cron / Supabase Edge Function) para sincronizar cobranças
    vencidas e gerar notificações, hoje calculado sob demanda ao abrir as
    telas correspondentes.

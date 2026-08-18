@@ -545,7 +545,7 @@ async function main() {
   }
 
   // Contrato ativo — Café Aroma (locatário do portal), com uma cobrança pendente e histórico de pagamentos
-  await createContractWithCharges({
+  const contractCafeAroma = await createContractWithCharges({
     number: "CT-2025-0001",
     propertyId: patioTijuco.id,
     tenantId: tenantForPortal.id,
@@ -721,6 +721,50 @@ async function main() {
   }
 
   console.log(`Seed: ${ticketsSeed.length} chamados de manutenção criados.`);
+
+  // ---------------------------------------------------------------------
+  // Vistorias
+  // ---------------------------------------------------------------------
+  await prisma.inspection.create({
+    data: {
+      contractId: contractCafeAroma.id,
+      type: "ENTRADA",
+      performedAt: contractCafeAroma.startDate,
+      responsibleName: "Equipe de gestão — Pátio Tijuco",
+      signedByTenant: true,
+      notes: "Vistoria de entrada sem ressalvas relevantes.",
+      items: {
+        create: [
+          { label: "Pisos sem trincas ou manchas", answer: "CONFORME", order: 0 },
+          { label: "Paredes e pintura em bom estado", answer: "CONFORME", order: 1 },
+          { label: "Portas e fechaduras funcionando", answer: "CONFORME", order: 2 },
+          { label: "Instalações elétricas (tomadas, interruptores, quadro)", answer: "CONFORME", order: 3 },
+          { label: "Instalações hidráulicas (registros, torneiras, ralos)", answer: "NAO_CONFORME", notes: "Pequeno vazamento no registro da pia — encaminhado à manutenção.", order: 4 },
+          { label: "Vidros e esquadrias íntegros", answer: "CONFORME", order: 5 },
+          { label: "Limpeza geral do imóvel", answer: "CONFORME", order: 6 },
+        ],
+      },
+    },
+  });
+
+  const periodicUnit = unitByCode("A-01");
+  await prisma.inspection.create({
+    data: {
+      unitId: periodicUnit.id,
+      type: "PERIODICA",
+      scheduledAt: addDays(new Date(), 7),
+      items: {
+        create: [
+          { label: "Conservação geral da unidade", order: 0 },
+          { label: "Sinais de infiltração ou umidade", order: 1 },
+          { label: "Instalações elétricas e hidráulicas em funcionamento", order: 2 },
+          { label: "Cumprimento do uso previsto em contrato", order: 3 },
+        ],
+      },
+    },
+  });
+
+  console.log("Seed: vistorias criadas.");
 
   // ---------------------------------------------------------------------
   // Documentos
